@@ -45,7 +45,11 @@ MAIN_HEADERS.append( ["User-Agent","Mozilla/5.0 (Windows NT 6.2; rv:23.0) Gecko/
 
 def isGeneric():
     return True
-
+    
+def openconfig(item):
+    config.open_settings( )
+    return []
+    
 def login():
     logger.info("[megaforo.py] login")
     # Calcula el hash del password
@@ -64,7 +68,7 @@ def mainlist(item):
     logger.info("[megaforo.py] mainlist")
     itemlist = []
     if config.get_setting("megaforoaccount")!="true":
-        itemlist.append( Item( channel=__channel__ , title="Habilita tu cuenta en la configuración..." , action="" , url="" , folder=False ) )
+        itemlist.append( Item( channel=__channel__ , title="Habilita tu cuenta en la configuración..." , action="openconfig" , url="" , folder=False ) )
     else:
         if login():
             itemlist.append( Item( channel=__channel__ , title="Series" , action="foro" , url="http://mega-foro.com/series-de-tv/" , folder=True ) )
@@ -84,26 +88,36 @@ def foro(item):
     itemlist=[]
     data = scrapertools.cache_page(item.url)
     
-    if '<h3 class="catbg">Subforos</h3>' in data:
-        patron = '<a class="subj(.*?)ct" href="([^"]+)" name="[^"]+">([^<]+)</a>' # HAY SUBFOROS
-        action = "foro"
-    else:
-        patron = '<span id="([^"]+)"><a href="([^"]+)">([^<]+)</a> </span>'
-        action = "findvideos"
-       
+    '''
+    alt="&Iacute;ndices Autom&aacute;ticos" title="&Iacute;ndices Autom&aacute;ticos" /></a>
+		<p>Apartado exclusivo para estrenos en Castellano (Cam, TS, BRScrener, DVDs, .etc)</p>
+		'''
+
+    patron = '<a class="subject" href="([^"]+)" name="[^"]+">([^<]+)</a>.*?<p>([^<]+)</p>' # HAY SUBFOROS
     matches = re.compile(patron,re.DOTALL).findall(data)
-    for scrapedmsg, scrapedurl,scrapedtitle in matches:
-            scrapedmsg = scrapedmsg.replace("msg_",";msg=")
+    for scrapedurl,scrapedtitle, scrapedplot in matches:
             url = urlparse.urljoin(item.url,scrapedurl)
-            scrapedtitle = scrapertools.htmlclean(scrapedtitle)
-            scrapedtitle = unicode( scrapedtitle, "iso-8859-1" , errors="replace" ).encode("utf-8")
-            title = scrapedtitle
-            thumbnail = ""
-            plot = scrapedmsg
-            # Añade al listado
-            if not 'Listado' in title:
-               itemlist.append( Item(channel=__channel__, action=action, title=title, url=url , thumbnail=thumbnail , plot=plot , folder=True) )
-			
+            itemlist.append( Item(channel=__channel__, action="foro", title=scrapedtitle, url=scrapedurl, plot=scrapedplot , folder=True) )
+            
+    '''
+    <td class="subject windowbg2">
+      <div >
+        <span id="msg_52546"><a href="http://mega-foro.com/estrenos-cine/espias-(webscreener-hc-1080p-hc-720p-hc-720x400)-(castellano)(2015)(lolabits)/">Espías [WEBScreener HC 1080p , HC 720p ,HC 720×400] [Castellano][2015][lolabits]</a> </span>
+        <p>Iniciado por <a href="http://mega-foro.com/profile/?u=66769" title="Ver perfil de theghostper">theghostper</a>
+          <small id="pages52546"></small>
+        </p>
+      </div>
+    </td>
+    '''
+    
+    patron = '<span id="msg_[0-9]+"><a href="([^"]+)">([^"<]+)</a> </span>'
+    matches = re.compile(patron,re.DOTALL).findall(data)
+    for scrapedurl,scrapedtitle in matches:
+            url = urlparse.urljoin(item.url,scrapedurl)
+            itemlist.append( Item(channel=__channel__, action="findvideos", title=scrapedtitle, url=scrapedurl , folder=True) )
+
+
+
     # EXTREA EL LINK DE LA SIGUIENTE PAGINA
     patron = 'div class="pagelinks floatleft.*?<strong>[^<]+</strong>\] <a class="navPages" href="(?!\#bot)([^"]+)">'
     matches = re.compile(patron,re.DOTALL).findall(data)
